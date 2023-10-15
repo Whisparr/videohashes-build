@@ -25,3 +25,136 @@ stages:
           # Set the build name properly.  The 'name' property won't recursively expand so hack here:
           - bash: echo "##vso[build.updatebuildnumber]$VIDEOHASHVERSION"
             displayName: Set Build Name
+
+  - stage: videohashes
+    displayName: Build videohashes
+    jobs:
+      - job: build
+        strategy:
+          matrix:
+            linux-x64:
+              folder: 'linux-x64'
+              makeFile: 'linux-amd64'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            linux-x86:
+              folder: 'linux-x86'
+              makeFile: 'linux-386'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            linux-arm:
+              folder: 'linux-arm'
+              makeFile: 'linux-arm'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            linux-arm64:
+              folder: 'linux-arm64'
+              makeFile: 'linux-arm64'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            osx-x64:
+              folder: 'osx-x64'
+              makeFile: 'macos-amd64'
+              poolName: 'Azure Pipelines'
+              imageName: 'macOS-12'
+            osx-arm64:
+              folder: 'osx-arm64'
+              makeFile: 'macos-arm64'
+              poolName: 'Azure Pipelines'
+              imageName: 'macOS-12'
+            win-x64:
+              folder: 'win-x64'
+              makeFile: 'windows-amd64'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            win-x86:
+              folder: 'win-x86'
+              makeFile: 'windows-386'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+            freebsd-x64:
+              folder: 'freebsd-x64'
+              makeFile: 'freebsd-amd64'
+              poolName: 'Azure Pipelines'
+              imageName: 'ubuntu-22.04'
+        pool:
+          name: $(poolName)
+          vmImage: $(imageName)
+        steps:
+          - checkout: self
+            submodules: true
+            fetchDepth: 1
+          - bash: |
+              cd videohashes
+              make ${MAKEFILE}
+            displayName: Build
+          - publish: videohashes/dist/$(makeFile)
+            artifact: videohashes-$(folder)
+            displayName: Publish VideoHashes
+
+  - stage: Package
+    jobs:
+      - job: Nuget
+        pool:
+          vmImage: 'ubuntu-22.04'
+        steps:
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-linux-x64
+              targetPath: linux-x64/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-linux-x86
+              targetPath: linux-x86/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-linux-arm64
+              targetPath: linux-arm64/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-linux-arm
+              targetPath: linux-arm/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-win-x64
+              targetPath: win-x64/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-win-x86
+              targetPath: win-x86/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-freebsd-x64
+              targetPath: freebsd-x64/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-osx-arm64
+              targetPath: osx-arm64/output
+          - task: DownloadPipelineArtifact@2
+            inputs:
+              buildType: 'current'
+              artifactName: videohashes-osx-x64
+              targetPath: osx-x64/output
+          - bash: |
+              sed -i'' -e "s/<version>[0-9.*]\+<\/version>/<version>${VIDEOHASHVERSION}<\/version>/g" Whisparr.VideoHashes.nuspec
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'pack'
+              projects: 'Whisparr.VideoHashes.csproj'
+          - publish: $(Build.ArtifactStagingDirectory)
+            artifact: nuget
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'push'
+              packagesToPush: '$(Build.ArtifactStagingDirectory)/**/*.nupkg'
+              nuGetFeedType: 'internal'
+              publishVstsFeed: '44b49c82-b0a5-4d80-a66c-0b39822fd3c2/4dae1f57-4b31-4660-b4f4-55c4d3ce218d'
+            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'))

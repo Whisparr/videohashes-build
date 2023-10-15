@@ -1,0 +1,4 @@
+[submodule "videohashes"]
+	path = videohashes
+	url = https://github.com/Whisparr/videohashes.git
+	branch = servarr
