@@ -1,0 +1,27 @@
+variables:
+  majorVersion: '2022.12.20'
+  minorVersion: $[counter('minorVersion', 1)]
+  videohashVersion: '$(majorVersion).$(minorVersion)'
+
+trigger:
+  branches:
+    include:
+    - master
+
+pr:
+  branches:
+    include:
+    - master
+
+stages:
+  - stage: Setup
+    displayName: Setup
+    jobs:
+      - job:
+        displayName: Build Variables
+        pool:
+          vmImage: 'ubuntu-22.04'
+        steps:
+          # Set the build name properly.  The 'name' property won't recursively expand so hack here:
+          - bash: echo "##vso[build.updatebuildnumber]$VIDEOHASHVERSION"
+            displayName: Set Build Name
